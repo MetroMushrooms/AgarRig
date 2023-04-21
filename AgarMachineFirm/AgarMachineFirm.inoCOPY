@@ -1,0 +1,855 @@
+//accelstepper constant speed example has been altered and is being used
+// not using default 4 wires setup, but instead using step, direction, and enable pins
+// using TB6600 4A 9-42V stepper driver at 6400 pulses/rev (32 microsteps)
+
+//Accel Library for driving stepper motors 
+#include <AccelStepper.h>
+// #include <U8g2lib.h>
+#include <math.h>   
+// #include <SPI.h>
+// #include <Wire.h>
+// #include <ClickEncoder.h>
+// #include <Menu.h>
+
+//Set homeswitches
+#define home_switch                      3
+#define lower_carousel_homeSensor        2
+#define higher_carousel_homeSensor      14
+#define KILL_PIN                        41
+
+// LCD Stuff 
+#define BEEPER_PIN 37
+
+
+
+// defines Actuator pin numbers
+const int ACstepPin = 54;
+const int ACdirectionPin = 55;
+const int ACenablePin = 38;
+//Create Actuator Stepper 
+AccelStepper Actuator(AccelStepper::DRIVER, ACstepPin, ACdirectionPin);
+
+// defines Lowcar pin numbers
+const int LowcarstepPin = 60;
+const int LowcardirectionPin = 61;
+const int LowcarenablePin = 56;
+//Create Actuator Stepper 
+AccelStepper Lowcar(AccelStepper::DRIVER, LowcarstepPin, LowcardirectionPin);
+
+// defines Highcar pin numbers
+const int HighcarstepPin = 46;
+const int HighcardirectionPin = 48;
+const int HighcarenablePin = 62;
+//Create Actuator Stepper 
+AccelStepper Highcar(AccelStepper::DRIVER, HighcarstepPin, HighcardirectionPin);
+
+// defines PUMP pin numbers
+const int PumpstepPin = 26;
+const int PumpdirectionPin = 28;
+const int PumpenablePin = 24;
+//Create Actuator Stepper 
+AccelStepper Pump(AccelStepper::DRIVER, PumpstepPin, PumpdirectionPin);
+
+// // LCD STUFF
+// bool Running = true;
+// bool homeScreen = true;
+// int units = 0;
+// char *menu_current[20];
+// char *menu_settings[20];
+// uint8_t menu_item_current  = 0;
+// uint8_t menu_length_current  = 0;
+// uint8_t menu_length_settings  = 0;
+// uint8_t menu_redraw_required = 0;
+// int16_t last, value;                  // store position of encoder
+// unsigned int sensorReadFreq = 1; // Hz
+// // Init graphics controller
+// U8G2_ST7920_128X64_1_SW_SPI u8g2(U8G2_R0, 23 , 17, 16 );
+// ClickEncoder *encoder;                //Create instance of ClickEncoder class
+
+
+
+//Actuator stepper variables 
+String dataIn = "";
+String manualStatus = "";
+int count = 0;
+int dist;
+long initial_homing=-1;
+
+int Lcount = 0;
+int Ldist;
+long Linitial_homing=1;
+
+void setup()
+{
+  Serial.begin(9600);
+
+    
+  //   //Sets up main menu, pointer stored in menu_current
+  //   memcpy(menu_current, menu_setup, sizeof(menu_setup));
+  //   menu_length_current = *(&menu_setup + 1) - menu_setup ;
+    
+  //   //Sets up settings sub menu, pointer stored in menu_settings
+  //   memcpy(menu_settings, settings_menu, sizeof(settings_menu));
+  //   menu_length_settings = *(&settings_menu + 1) - settings_menu ;
+
+
+  //   // set up click encoder
+  //   //encoder = new ClickEncoder(BTN_EN2, BTN_EN1, BTN_ENC);
+  //   encoder = new ClickEncoder(33, 31, 35);
+  //   last = -1;
+
+  //   // initialize timers
+  //   noInterrupts();           // disable all interrupts
+
+  //   // encoder read timer
+  //   TCCR2A = 0;
+  //   TCCR2B = 0;
+  //   TCNT2  = 0;
+  //   OCR2A = round(16000000 / 1024 / 1000);        // compare match register e.g. 16MHz/1024/100Hz
+  //   TCCR2B |= (1 << WGM12);   // CTC mode
+  //   TCCR2B |= (1 << CS12) | (1 << CS10);  // 1024 prescaler
+  //   TIMSK2 |= (1 << OCIE2A);  // enable timer compare interrupt
+  //   interrupts();             // enable all interrupts
+
+  //   // Menu splash screen
+  //   u8g2.begin(); // Write startup message to LCD
+  //   u8g2.setFontPosTop(); // references position to top of font
+  //   do {
+  //     u8g2.setFont(u8g2_font_ncenB14_tr);
+  //     u8g2.drawStr(10, 10, "Starting...");
+  //   } while ( u8g2.nextPage() );
+
+
+
+  // //LCD Beeper 
+  // pinMode(BEEPER_PIN, OUTPUT);
+  // digitalWrite(BEEPER_PIN, LOW);
+
+   //Actuator Limit Switch
+  pinMode(home_switch, INPUT_PULLUP);
+  delay(5);
+
+  //Lower Carousel homing sensor
+  pinMode(lower_carousel_homeSensor, INPUT);
+  delay(5);
+
+  //Upper Carousel homing sensor 
+  pinMode(higher_carousel_homeSensor, INPUT);
+  delay(5);
+
+//   //BEGIN ACTUATOR SETUP
+//   Actuator.setEnablePin(ACenablePin);
+//   Actuator.setPinsInverted(false, false, true);
+//   Actuator.enableOutputs();
+//   Actuator.setMaxSpeed(1000);
+//   Actuator.setSpeed(700);
+//   Actuator.setAcceleration(100);
+
+//   Serial.print("Actuator is Homing...........");
+
+//   while (!digitalRead(home_switch)) { // Move Actuator CCW until switch triggered
+//     // Serial.println("Moving to switch...........");
+//     Actuator.moveTo(initial_homing); //Set the position to move to
+//     initial_homing--; 
+//     Actuator.run();
+//     delay(5);
+//   }
+
+//   Actuator.setCurrentPosition(0);
+//   Actuator.setMaxSpeed(1000);
+//   Actuator.setAcceleration(100);
+//   initial_homing=1;
+  
+//   while (digitalRead(home_switch)) { //Move CW until limit is released
+//     //Serial.println("Moving away from switch...........");
+//     Actuator.moveTo(initial_homing);
+//     Actuator.run();
+//     initial_homing++;
+//     delay(5);
+//   }
+
+//   Actuator.setCurrentPosition(0);
+//   Serial.println("Actuator homing Completed");
+//   Serial.println("");
+//   Actuator.setMaxSpeed(1000);
+//   Actuator.setAcceleration(1000);
+
+//   int count = 0;
+//   int dist;
+//   long initial_homing=-1;
+//   delay(500);
+// //END ACTUATOR SETUP 
+
+
+// //BEGIN LOWER CAROUSEL SETUP  
+//   Serial.println("Homing Lower Carousel");
+
+//   Lowcar.setEnablePin(LowcarenablePin);
+//   Lowcar.setPinsInverted(false, false, true);
+//   Lowcar.enableOutputs();
+//   Lowcar.setMaxSpeed(1000);
+//   Lowcar.setSpeed(400);
+//   Lowcar.setAcceleration(100);
+
+//   Serial.print("Lowcar is Homing...........");
+
+//   while (!digitalRead(lower_carousel_homeSensor)) { 
+//     Lowcar.moveTo(Linitial_homing); //Set the position to move to
+//     Linitial_homing++; 
+//     Lowcar.run();
+//     delay(5);
+//   }
+
+//   Lowcar.setCurrentPosition(0);
+//   Lowcar.setMaxSpeed(1000);
+//   Lowcar.setAcceleration(100);
+//   Linitial_homing=-1;
+  
+//   while (digitalRead(lower_carousel_homeSensor)) { 
+//     Lowcar.moveTo(Linitial_homing);
+//     Lowcar.run();
+//     Linitial_homing--;
+//     delay(5);
+//   }
+
+//   Lowcar.setCurrentPosition(0);
+
+//   while (Lowcar.currentPosition()!= 30) {
+//   Lowcar.setSpeed(200);
+//   Lowcar.run();
+
+//   }
+//   Lowcar.setCurrentPosition(0);
+//   Serial.println("Lowcar homing Completed");
+//   Serial.println("");
+//   Lowcar.setMaxSpeed(1000);
+//   Lowcar.setAcceleration(1000);
+//   delay(500);
+
+// //BEGIN Higher CAROUSEL SETUP  
+//   Serial.println("Homing Lower Carousel");
+
+//   Highcar.setEnablePin(HighcarenablePin);
+//   Highcar.setPinsInverted(false, false, true);
+//   Highcar.enableOutputs();
+//   Highcar.setMaxSpeed(1000);
+//   Highcar.setSpeed(400);
+//   Highcar.setAcceleration(100);
+
+//   Serial.print("Highcar is Homing...........");
+
+//   while (!digitalRead(higher_carousel_homeSensor)) { 
+//     Highcar.moveTo(initial_homing); //Set the position to move to
+//     initial_homing--; 
+//     Highcar.run();
+//     delay(5);
+//   }
+
+//   Highcar.setCurrentPosition(0);
+//   Highcar.setMaxSpeed(1000);
+//   Highcar.setAcceleration(100);
+//   initial_homing=1;
+  
+//   while (digitalRead(higher_carousel_homeSensor)) { 
+//     Highcar.moveTo(initial_homing);
+//     Highcar.run();
+//     initial_homing++;
+//     delay(5);
+//   }
+
+//   Highcar.setCurrentPosition(0);
+//   while (Highcar.currentPosition() != 100) {
+//   Highcar.setSpeed(200);
+//   Highcar.run();
+
+//   }
+//   Highcar.setCurrentPosition(0);
+//   while (Highcar.currentPosition() != -400) {
+//   Highcar.setSpeed(-200);
+//   Highcar.run();
+
+//   }
+//   Highcar.setCurrentPosition(0);
+//   Serial.println("Highcar homing Completed");
+//   Serial.println("");
+//   Highcar.setMaxSpeed(1000);
+//   Highcar.setAcceleration(1000);
+//   delay(500);
+
+//   // Enable Pump 
+//   Pump.setEnablePin(PumpenablePin);
+//   Pump.setPinsInverted(false, false, true);
+//   Pump.enableOutputs();
+//   Pump.setMaxSpeed(1000);
+//   Pump.setSpeed(400);
+//   Pump.setAcceleration(100);
+
+//   Serial.println("Pump Enabled");  
+// //PRINT MESSAGE TO LOOP AFTER SETUP 
+//   Serial.println("Enter a mode: ");
+}
+
+  // TIMER ISRs
+  // ----------------------------------------------------------------------------
+
+
+  // ISR(TIMER2_COMPA_vect)
+  // {
+  //   encoder->service();
+  // }
+
+
+void loop()
+{   
+    // if (homeScreen == true) {
+    //   while (encoder->getButton() != 3) {
+    //       u8g2.firstPage();
+    //     do {
+    //       u8g2.setFont(u8g2_font_fub11_tf);
+    //       u8g2.drawStr(10, 10, "Press to start");
+    //       if (encoder->getButton() == 3) {
+    //         homeScreen = false;
+    //         Running = false;
+    //         break;            
+    //       }
+    //     } while ( u8g2.nextPage() );        
+    //   }
+    // }
+
+  //   //If running go to menu selection 
+  //   if (Running) {
+  //   u8g2.firstPage();
+  //   do {
+  //     u8g2.setCursor(10, 15);
+  //     switch (units) {
+  //       case 0:
+  //         u8g2.setCursor(10, 15);
+  //         u8g2.setFont(u8g2_font_fub11_tf);
+  //         u8g2.print("Send It!!");
+  //         // manual();
+  //         actuationRotation();
+  //         Serial.print("Out of the loop");
+  //         Running = false;
+  //         delay(1000);
+  //         break;
+  //       case 1:
+  //         u8g2.setCursor(10, 15);
+  //         u8g2.setFont(u8g2_font_fub11_tf);
+  //         u8g2.print("Settings");
+  //         settingsMenu();
+  //         Running = false;
+  //         break;
+  //     }
+  //   } while ( u8g2.nextPage() );
+
+  // } else {  //Draw Menu
+  //   if (menu_redraw_required != 0) {
+  //     u8g2.firstPage();
+  //     do  {
+  //       drawMenu(menu_setup, *(&menu_setup + 1) - menu_setup  );
+  //     } while ( u8g2.nextPage() );
+  //     menu_redraw_required = 0;
+  //   }
+  // }
+
+  // // ClickEncoder
+  // value += encoder->getValue();
+  // if (value < 0) {
+  //   value = 0;
+  // }
+  // if (value > menu_length_current - 1) {
+  //   value = menu_length_current - 1;
+  // }
+  // if (value != last) {
+  //   Serial.print("Encoder Value: ");
+  //   Serial.println(value);
+  //   updateMenu(value);                            // update menu bar
+  //   last = value;
+  // }
+
+
+  // ClickEncoder::Button b = encoder->getButton();
+  // if (b != ClickEncoder::Open) {
+  //   switch (b) {
+  //     case ClickEncoder::Clicked:
+  //       Serial.println("ClickEncoder::Clicked");
+  //       digitalWrite(BEEPER_PIN, HIGH);
+  //       delay(100);
+  //       digitalWrite(BEEPER_PIN, LOW);
+  //       if (Running == 0) {
+  //         menu_redraw_required = 1;
+  //         menuClick(value);
+  //       } else {
+  //         Running = 0;
+  //       }
+  //       break;
+  //     case ClickEncoder::Pressed:
+  //       Serial.println("ClickEncoder::Pressed");
+  //       digitalWrite(BEEPER_PIN, HIGH);
+  //       delay(100);
+  //       digitalWrite(BEEPER_PIN, LOW);        
+  //       break;
+  //     case ClickEncoder::DoubleClicked:
+  //       Serial.println("ClickEncoder::DoubleClicked");
+  //       digitalWrite(BEEPER_PIN, HIGH);
+  //       delay(100);
+  //       digitalWrite(BEEPER_PIN, LOW);
+  //       break;
+  //   }
+  // }
+}
+
+
+
+// ----------------------------------------------------------------------------
+// MOTOR FUNCTIONS 
+// ----------------------------------------------------------------------------
+
+//Go Mode 
+void actuationRotation() {
+    Serial.println("AcutationRotation Cycle Start");
+    //Home Actuator 
+    // homeAc();
+    // Actuator.setSpeed(250);
+  while (encoder->getButton() != 3) {
+    boolean firstPlate = true;
+    int plateCount = 50;    
+    int platesFilled = 0;
+
+    Actuator.setMaxSpeed(6000);
+    Actuator.setAcceleration(1000); 
+    
+    Lowcar.setMaxSpeed(200);
+    Lowcar.setAcceleration(800); 
+
+    Highcar.setMaxSpeed(1000);
+    Highcar.setAcceleration(800); 
+
+    Pump.setMaxSpeed(6000);
+    Pump.setAcceleration(1000);
+    
+    //Load our First Plate 
+    while (firstPlate == true) {
+      //Actuator Rises to top to recieve plate from High Carousel 
+      Actuator.moveTo(31700);
+      Actuator.runToPosition();
+      Actuator.setCurrentPosition(0);
+      if (encoder->getButton() == 3) break;
+      delay(5);
+      //High Carousel rotates empty plate slot to sit on Actuator 
+      Highcar.moveTo(400);
+      Highcar.runToPosition();
+      Highcar.setCurrentPosition(0);
+      if (encoder->getButton() == 3) break;
+      delay(5);
+      //Actuator drop just below high carousel platform 
+      Actuator.moveTo(-5800);
+      Actuator.runToPosition();
+      Actuator.setCurrentPosition(0);
+      if (encoder->getButton() == 3) break;
+      delay(5);
+      //High Carousel rotates to awkward position to prevent plate falling
+      Highcar.moveTo(-400);
+      Highcar.runToPosition();
+      Highcar.setCurrentPosition(0);
+      if (encoder->getButton() == 3) break;
+      delay(5);
+      //Actuator drop below Lower Carousel and deposit first plate 
+      Actuator.moveTo(-25900);
+      Actuator.runToPosition();
+      Actuator.setCurrentPosition(0);
+      plateCount--;
+      if (encoder->getButton() == 3) break;
+      delay(5);
+      //Lower Carousel Rotate, placing a empty plate in filling position 
+      Lowcar.moveTo(800);
+      Lowcar.runToPosition();
+      Lowcar.setCurrentPosition(0);
+      if (encoder->getButton() == 3) break;
+      delay(5);
+      //update frist plate state 
+      firstPlate = false;       
+    }
+
+    //Continue loading plates 
+    while (firstPlate == false) {
+      Serial.println("Loading additional plates, accounting for filled plate");
+      
+      //Fill plate 
+      // while (Pump.currentPosition() != 100000) {
+      //   Pump.setMaxSpeed(5000);
+      //   Pump.setSpeed(5000);
+      //   Pump.run();
+      //   if (encoder->getButton() == 3) break;
+      // }
+
+      if (encoder->getButton() == 3) break;
+      Pump.setCurrentPosition(0);
+      platesFilled++;
+
+      //Actuator Pushes plate up to platform level of High carousel
+      Serial.println("Actuator Pushes plate up to platform level of High carousel");
+      Actuator.moveTo(25000);
+      Actuator.runToPosition();
+      Actuator.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+      //High Carousel rotates filled plate stack over newly filled plate 
+      Serial.println("Placing Filled Stack Over Filled Plate");
+      Highcar.moveTo(-400);
+      Highcar.runToPosition();
+      Highcar.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+      //Actuator pushes plate up stack, now actuator is at platform level 33k
+      Serial.println("Pushing Plate into stack");
+      Actuator.moveTo(7500);
+      Actuator.runToPosition();
+      Actuator.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+      //High Carousel rotates to awkward position for filled plates
+      Serial.println("Sweeping filled plate");
+      Highcar.moveTo(400);
+      Highcar.runToPosition();
+      Highcar.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+      //High Carousel rotates to empty plate stack
+      Serial.println("Placing empty plate on Actuator");
+      Highcar.moveTo(400);
+      Highcar.runToPosition();
+      Highcar.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+      //Actuator drop plate to platform level 
+      Actuator.moveTo(-7500);
+      Actuator.runToPosition();
+      Actuator.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+      //High Carousel rotates Holding Position
+      Highcar.moveTo(400);
+      Highcar.runToPosition();
+      Highcar.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+      //Actuator Pushes plate up to platform level of High carousel
+      Actuator.moveTo(-25000);
+      Actuator.runToPosition();
+      Actuator.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+      //Lower Carousel Rotate, placing a empty plate in filling position 
+      Lowcar.moveTo(800);
+      Lowcar.runToPosition();
+      Lowcar.setCurrentPosition(0);
+      delay(1000);
+      if (encoder->getButton() == 3) break;
+    }
+  }
+  Serial.println("Exiting cycle and returning to main loop");
+  return;
+}
+
+//Mode for manual jogging
+void manual() {
+  //29500 is the top 
+  String dataInS;
+  dataIn ="";
+  Serial.println("Entered Manual Mode, Type end to exit");
+   while (!dataIn.startsWith("end")) { //Stay in manual mode until "exit"
+     dataIn = Serial.readString();
+
+      //ACTUATOR Up Functionality      
+      if (dataIn.startsWith("u")) {
+      dataInS = dataIn.substring(1, dataIn.length()); // Reads up value "u13"
+      dist = dataInS.toInt();
+      Serial.print("Move up ");
+      Serial.print(dist);
+      Serial.println(" steps");
+      while (Actuator.currentPosition() != dist) {
+        Actuator.setSpeed(1000);
+        Actuator.run();
+      }
+      Actuator.setCurrentPosition(0);
+      delay(100);
+    }
+
+    //ACTUATOR Down Functionality Functionality      
+      if (dataIn.startsWith("d")) {
+      dataInS = dataIn.substring(1, dataIn.length()); // Reads up value "u13"
+      dist = ((dataInS.toInt()) * -1);
+      Serial.print("Move Down ");
+      Serial.print(dist);
+      Serial.println(" steps");
+      while (Actuator.currentPosition() != dist) {
+        Actuator.setSpeed(-1000);
+        Actuator.run();
+        // if (!digitalRead(home_switch)) {
+        //   return;
+        // }
+      }
+      Actuator.setCurrentPosition(0);
+      delay(100);
+    }
+
+        //LOWER CAROUSEL CW Functionality      
+      if (dataIn.startsWith("l")) {
+      dataInS = dataIn.substring(1, dataIn.length()); // Reads up value "l13"
+      dist = ((dataInS.toInt()) * 1);
+      Serial.print("Move Down ");
+      Serial.print(dist);
+      Serial.println(" steps");
+      while (Lowcar.currentPosition() != dist) {
+        Lowcar.setMaxSpeed(2000);
+        Lowcar.setSpeed(500);
+        Lowcar.run();
+        // if (!digitalRead(home_switch)) {
+        //   return;
+        // }
+      }
+      Lowcar.setCurrentPosition(0);
+      delay(100);
+    }
+
+    //High CAROUSEL CW Functionality      
+      if (dataIn.startsWith("h")) {
+      dataInS = dataIn.substring(1, dataIn.length()); // Reads up value "h13"
+      dist = ((dataInS.toInt()) * 1);
+      Serial.print("Move Down ");
+      Serial.print(dist);
+      Serial.println(" steps");
+      while (Highcar.currentPosition() != dist) {
+        Highcar.setMaxSpeed(2000);
+        Highcar.setSpeed(500);
+        Highcar.run();
+        // if (!digitalRead(home_switch)) {
+        //   return;
+        // }
+      }
+      Highcar.setCurrentPosition(0);
+      delay(100);
+    }
+
+    //Pump Functionality      
+      if (dataIn.startsWith("p")) {
+      dataInS = dataIn.substring(1, dataIn.length()); // Reads pump value "p13"
+      dist = ((dataInS.toDouble()) * 1);
+      Serial.print("Pumping ");
+      Serial.print(dist);
+      Serial.println(" steps");
+      while (Pump.currentPosition() != dist) {
+        Pump.setMaxSpeed(5000);
+        Pump.setSpeed(5000);
+        Pump.run();
+        // if (!digitalRead(home_switch)) {
+        //   return;
+        // }
+      }
+      // Pump.setMaxSpeed(4000);
+      // Pump.setAcceleration(500); 
+      // Pump.moveTo(29000);
+      // Pump.runToPosition();
+      // Pump.setCurrentPosition(0);
+      // delay(5);
+      delay(100);
+    }
+   }
+   Serial.println("exiting Manual mode");
+  
+   return;
+}
+
+//Homing Function. Dog shit rn. 
+void homeAc() {
+  dataIn ="";
+  Actuator.setSpeed(250);
+  Actuator.setAcceleration(100);
+
+  Serial.print("Actuator is Homing...........");
+
+  while (!digitalRead(home_switch)) { // Move Actuator CCW until switch triggered
+    // Serial.println("Moving to switch...........");
+    Actuator.moveTo(initial_homing); //Set the position to move to
+    initial_homing--; 
+    Actuator.run();
+    delay(5);
+  }
+
+  Actuator.setCurrentPosition(0);
+  Actuator.setMaxSpeed(1000);
+  Actuator.setAcceleration(100);
+  initial_homing=1;
+  
+  while (digitalRead(home_switch)) { //Move CW until limit is released
+    //Serial.println("Moving away from switch...........");
+    Actuator.moveTo(initial_homing);
+    Actuator.run();
+    initial_homing++;
+    delay(5);
+  }
+
+  Actuator.setCurrentPosition(0);
+  Serial.println("Homing Completed");
+  Actuator.setMaxSpeed(1000);
+  Actuator.setAcceleration(100);
+
+  Serial.println("Returning to mode Selection");
+
+  return; 
+}
+
+// Test mode for Hall sensors 
+void hall() {
+  
+  //
+  while (!dataIn.startsWith("end")) {
+
+    while (digitalRead(lower_carousel_homeSensor)) {
+      Serial.println("no magnet detected");
+      if (!digitalRead(lower_carousel_homeSensor)) {
+        Serial.println("Magnet Detected!");
+      }    
+    }
+
+    // while (magnetDetected == true) {
+    //   Serial.println("Magnet Detected!");
+    //   if (digitalRead(lower_carousel_homeSensor)) {
+    //     magnetDetected = false;
+    //   }
+    // }
+  }
+  
+}
+
+// ----------------------------------------------------------------------------
+// MENU HANDLING ROUTINES
+// ----------------------------------------------------------------------------
+void drawMenu(const char *menu[], uint8_t menu_len) {
+  uint8_t i, h;
+  u8g2_uint_t w, d;
+  u8g2.setFont(u8g_font_6x13);
+  u8g2.setFontRefHeightText();
+  h = u8g2.getFontAscent() - u8g2.getFontDescent();
+  w = u8g2.getWidth();
+  for (  i = 0; i < menu_len; i++ ) {
+    d = 5; // menu indent
+    if ( i == menu_item_current ) {
+      u8g2.drawBox(0, i  * h  , w, h);
+      u8g2.setDrawColor(0);
+      u8g2.drawStr(d, i * h , menu[i]);
+      u8g2.setDrawColor(1);
+    } else {
+      u8g2.drawStr(d, i * h , menu[i]);
+    }
+  }
+}
+
+
+void updateMenu(int i) {
+  menu_item_current  = i;
+  menu_redraw_required = 1;
+}
+
+
+
+void   menuClick( uint8_t _value) {
+  Serial.print("menuClick\t");
+  Serial.println(_value);
+  units = _value;
+  Running = true;
+}
+
+// ----------------------------------------------------------------------------
+// SUB MENUS 
+// ----------------------------------------------------------------------------
+
+void settingsMenu() {
+  Running = false;
+  menu_redraw_required = 1;
+  bool Exit = false; 
+    // Serial.println("Entered Settings Menu");
+    //If running go to menu selection 
+  while (Exit == false) {
+        if (Running) {
+        // Serial.println("Entered Settings Menu If Running");
+    u8g2.firstPage();
+    do {
+      u8g2.setCursor(10, 15);
+      switch (units) {
+        case 0:
+          u8g2.setCursor(10, 15);
+          u8g2.setFont(u8g2_font_fub11_tf);
+          u8g2.print("Set Default Plates");
+          break;
+        case 1:
+          // u8g2.setCursor(10, 15);
+          // u8g2.setFont(u8g2_font_fub11_tf);
+          // u8g2.print("Exit");
+          Exit = true;
+          break;
+      }
+    } while ( u8g2.nextPage() );
+
+  } else {  //Draw Menu
+    if (menu_redraw_required != 0) {
+      //  Serial.println("Entered Settings Menu Redraw Condition");
+      u8g2.firstPage();
+      do  {
+        drawMenu(settings_menu, *(&settings_menu + 1) - settings_menu);
+      } while ( u8g2.nextPage() );
+      menu_redraw_required = 0;
+    }
+  }
+
+  // ClickEncoder
+  value += encoder->getValue();
+  if (value < 0) {
+    value = 0;
+  }
+  if (value > menu_length_settings - 1) {
+    value = menu_length_settings - 1;
+  }
+  if (value != last) {
+    Serial.print("Encoder Value: ");
+    Serial.println(value);
+    updateMenu(value);                            // update menu bar
+    last = value;
+  }
+
+
+  ClickEncoder::Button b = encoder->getButton();
+  if (b != ClickEncoder::Open) {
+    switch (b) {
+      case ClickEncoder::Clicked:
+        Serial.println("ClickEncoder::Clicked");
+        digitalWrite(BEEPER_PIN, HIGH);
+        delay(100);
+        digitalWrite(BEEPER_PIN, LOW);
+        if (Running == 0) {
+          menu_redraw_required = 1;
+          menuClick(value);
+        } else {
+          Running = 0;
+        }
+        break;
+      case ClickEncoder::Pressed:
+        Serial.println("ClickEncoder::Pressed");
+        digitalWrite(BEEPER_PIN, HIGH);
+        delay(100);
+        digitalWrite(BEEPER_PIN, LOW);
+        break;
+      case ClickEncoder::DoubleClicked:
+        Serial.println("ClickEncoder::DoubleClicked");
+        digitalWrite(BEEPER_PIN, HIGH);
+        delay(100);
+        digitalWrite(BEEPER_PIN, LOW);
+        break;
+    }
+  }
+  } 
+  // Serial.println("Returning to main menu");
+  Running = false;
+  return;
+}
